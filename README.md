@@ -22,12 +22,6 @@ XML structures and a fake API for the most common things that HTML5 apps do.
 2. compile using the standard Android SDK method, 'ant release'.  This will
    package everything into an APK, which is found in bin/.
 
-   If you compile it for the first time, you have to use the following
-   command to create the build template:
-	
-   `android update project --name GlesJSDemo --target android-14 --path .`
-
-
 ### Setting up (command line)
 
 This assumes you are using the command line to build. To set it up, install
