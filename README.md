@@ -1,6 +1,6 @@
 ## GLES.JS - Fast and small Android WebGL bindings for V8
 
-Copyright (c) 2015 by Boris van Schooten  tmtg.net  boris@13thmonkey.org
+Copyright (c) 2015 by Boris van Schooten ( tmtg.net / boris@13thmonkey.org).
 Released under revised BSD license. See LICENSE for details.
 
 Gles.js provides Android WebGL bindings for the Javascript V8 engine (ARMv7
@@ -36,26 +36,34 @@ install API level 14 (which is the minimum that guarantees ARMv7
 architecture).  Then, make sure that the following is in your PATH:
 
 ```
-    [ANT_DIR]/bin
-    [ANDROIDSDK_DIR]/platform-tools
-    [ANDROIDSDK_DIR]/tools
+[ANT_DIR]/bin
+[ANDROIDSDK_DIR]/platform-tools
+[ANDROIDSDK_DIR]/tools
 ```
 
 Also define the following variable:
 
 ```
-    ANDROID_HOME=[ANDROIDSDKROOT]
+ANDROID_HOME=[ANDROIDSDKROOT]
+```
+
+Now, initialise the SDK skeleton by running:
+
+```
+android update project --name GlesJSDemo --target android-14 --path .
 ```
 
 Once you've done this, you should be able to execute step (1) and (2) above.
 
 
-This procecure assumes you just use the compiled object file, libglesjs.so.
-If you want to tinker with gles.js itself, you will need the Android NDK as
-well. Download/unzip the NDK (no install is required). Make sure your PATH
-points to the NDK root dir. 
+### Compiling libglesjs.so
 
-### Directory structure
+The procecure above assumes you just use the compiled object file,
+libglesjs.so.  If you want to tinker with the gles.js native code, you will
+need the Android NDK as well. Download/unzip the NDK (no install is required).
+Make sure your PATH points to the NDK root dir. 
+
+#### Directory structure
 
 ```
 /            - Standard Android build files
@@ -69,7 +77,8 @@ jni/lib/     - Precompiled V8 linkables
 libs/        - Precompiled libs used by SDK, including libglesjs
 ```
 
-### The full compile process (in case you want to modify gles.js)
+
+#### Compile procedure
 
 1. Patch and build V8.  This is quite a mess, and currently not included in
    this package, so you'll have to do with the precompiled V8 binaries in
@@ -115,7 +124,7 @@ the package.
 - runs jgame.js (for me, this is its main purpose)
 
 
-Known issues:
+### Known issues
 
 - There is a bug which sometimes produces spurious mouse coordinates
 
