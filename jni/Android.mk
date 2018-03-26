@@ -1,8 +1,5 @@
 LOCAL_PATH := $(call my-dir)
 
-# afaik V8 uses v7a, so we might as well use it
-APP_ABI := armeabi-v7a
-
 # First, define local static libraries for use in LOCAL_STATIC_LIBRARIES
 # We need all of these for V8 to run.
 # We put them in jni/lib, but we could also put them somewhere else.
@@ -61,7 +58,8 @@ include $(CLEAR_VARS)
 LOCAL_MODULE    := glesjs
 LOCAL_SRC_FILES := main.cpp
 LOCAL_LDLIBS    := -llog -landroid -lEGL -lGLESv1_CM -lGLESv2
-LOCAL_STATIC_LIBRARIES := android_native_app_glue libv8_base libv8_libbase libv8_nosnapshot libstlport
+LOCAL_STATIC_LIBRARIES := libv8_base libv8_libbase libv8_nosnapshot libstlport
+#LOCAL_STATIC_LIBRARIES := android_native_app_glue libv8_base libv8_libbase libv8_nosnapshot libstlport
 LOCAL_C_INCLUDES := $(LOCAL_PATH)/include
 
 # hide symbols from included static libraries

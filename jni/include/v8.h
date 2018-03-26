@@ -812,13 +812,13 @@ class V8_EXPORT HandleScope {
     return reinterpret_cast<Isolate*>(isolate_);
   }
 
+  static internal::Object** CreateHandle(internal::Isolate* isolate,
+                                         internal::Object* value);
+
  protected:
   V8_INLINE HandleScope() {}
 
   void Initialize(Isolate* isolate);
-
-  static internal::Object** CreateHandle(internal::Isolate* isolate,
-                                         internal::Object* value);
 
  private:
   // Uses heap_object to obtain the current Isolate.

@@ -6,9 +6,13 @@
         android:versionCode="1"
         android:versionName="1.0">
 
-    <!-- Minimum API with armeabi-v7a -->
-    <uses-sdk android:minSdkVersion="14" />
+    <!-- 14 = Minimum API with armeabi-v7a -->
+    <!-- 17 = Minimum API with leanback support -->
+    <uses-sdk android:minSdkVersion="17" />
 	<uses-feature android:glEsVersion="0x00020000"></uses-feature>
+	<uses-feature android:name="android.hardware.touchscreen" android:required="false"/>
+	<uses-feature android:name="android.hardware.gamepad"/>
+
 
     <application android:label="@string/app_name"
 	android:icon="@drawable/icon">
@@ -27,8 +31,10 @@
                 <action android:name="android.intent.action.MAIN" />
                 <category android:name="android.intent.category.LAUNCHER" />
 				<category android:name="tv.ouya.intent.category.GAME"/>
+                <category android:name="android.intent.category.LEANBACK_LAUNCHER" />
             </intent-filter>
         </activity>
+
     </application>
 
 </manifest> 

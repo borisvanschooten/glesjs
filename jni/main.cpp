@@ -3,6 +3,7 @@
 #include <jni.h>
 #include <stdlib.h>
 #include <errno.h>
+#include <string.h>
 
 #include <EGL/egl.h>
 // at least some defs from gl1 are needed
@@ -11,12 +12,17 @@
 
 #include <android/sensor.h>
 #include <android/log.h>
-#include <android_native_app_glue.h>
+//#include <android_native_app_glue.h>
 
 #define LOGI(...) ((void)__android_log_print(ANDROID_LOG_INFO, "glesjs", __VA_ARGS__))
 #define LOGW(...) ((void)__android_log_print(ANDROID_LOG_WARN, "glesjs", __VA_ARGS__))
 
 #include <android/asset_manager.h>
+
+
+// replacement for old symbol found in current libv8 binary
+#include <unistd.h>
+unsigned int __page_size = getpagesize();
 
 
 #include <v8.h>
@@ -769,13 +775,13 @@ long readAsset(const char *filename, char **output) {
 }
 
 // init javascript engine
-static int init_javascript() {
+static void init_javascript() {
 	js = new JS();
 	V8::SetArrayBufferAllocator(new MallocArrayBufferAllocator());
 }
 
 // boot JS and pass window dimensions
-static int boot_javascript(int w,int h) {
+static void boot_javascript(int w,int h) {
 	// execute init scripts on context
 	char *source1;
 	// html5 sets up the html5 API and loads the JS

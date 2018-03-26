@@ -24,10 +24,20 @@ XML structures and a fake API for the most common things that HTML5 apps do.
 
 ### Setting up (command line)
 
-This assumes you are using the command line to build. To set it up, install
-Apache Ant and the Android SDK. Within the Android SDK package manager,
-install API level 14 (which is the minimum that guarantees ARMv7
-architecture).  Then, make sure that the following is in your PATH:
+These instructions assume you are using the command line to build.  For now
+you will need an old version of the Android SDK (before Ant support was
+removed).  To set it up, install Apache Ant and the latest version of Android
+SDK with Ant support (which is R25-2.5).
+
+[Linux](https://dl.google.com/android/repository/tools_r25.2.5-linux.zip)
+[Windows](https://dl.google.com/android/repository/tools_r25.2.5-windows.zip)
+[Mac](https://dl.google.com/android/repository/tools_r25.2.5-mac.zip)
+
+Within the Android SDK package manager, install API level 17, which is the
+minimum that handles leanback/TV applications. If you don't use this, you can
+go down to API level 14, which is the minimum that guarantees ARMv7
+architecture, but you'll need to change the API level in project.properties
+and Application.mk.  Then, make sure that the following is in your PATH:
 
 ```
 [ANT_DIR]/bin
@@ -44,7 +54,7 @@ ANDROID_HOME=[ANDROIDSDKROOT]
 Now, initialise the SDK skeleton by running:
 
 ```
-android update project --name GlesJSDemo --target android-14 --path .
+android update project --name GlesJSDemo --target android-17 --path .
 ```
 
 Once you've done this, you should be able to execute step (1) and (2) above.
@@ -54,8 +64,9 @@ Once you've done this, you should be able to execute step (1) and (2) above.
 
 The procecure above assumes you just use the compiled object file,
 libglesjs.so.  If you want to tinker with the gles.js native code, you will
-need the Android NDK as well. Download/unzip the NDK (no install is required).
-Make sure your PATH points to the NDK root dir. 
+need the Android NDK as well. Download/unzip the NDK (no install is required,
+version r16b was used to compile this package).  Make sure your PATH points to
+the NDK root dir. 
 
 #### Directory structure
 
