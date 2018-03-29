@@ -9,6 +9,7 @@ import android.opengl.*;
 
 import android.graphics.Bitmap;
 import android.graphics.BitmapFactory;
+import android.util.Base64;
 
 import android.preference.*;
 import android.content.SharedPreferences;
@@ -369,14 +370,23 @@ public class GlesJSUtils {
 		return dim;
 	}
 
+	private static final String DATA_PREFIX = "data:image/png;base64,";
+
 	public static int [] getImageDimensions(String assetname) {
 		BitmapFactory.Options options = new BitmapFactory.Options();
 		options.inJustDecodeBounds = true;
 		try {
-			//AssetFileDescriptor assetfd = assets.openFd(assetname);
-			InputStream assetin = assets.open(assetname);
-			//Returns null, sizes are in the options variable
-			BitmapFactory.decodeStream(assetin, null, options);
+
+			if (assetname.startsWith(DATA_PREFIX)) {
+				byte[] decodedByte = Base64.decode(assetname.substring(DATA_PREFIX.length()), Base64.DEFAULT);
+				BitmapFactory.decodeByteArray(decodedByte, 0, decodedByte.length, options); 
+			}
+			else {
+				//AssetFileDescriptor assetfd = assets.openFd(assetname);
+				InputStream assetin = assets.open(assetname);
+				//Returns null, sizes are in the options variable
+				BitmapFactory.decodeStream(assetin, null, options);
+			}
 		} catch (IOException e) {
 			System.err.println("Java: getImageDimensions: Could not decode bitmap "+assetname);
 			return new int[] {0,0};

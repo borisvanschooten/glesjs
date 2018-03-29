@@ -179,10 +179,19 @@ _gl.getParameter = function(key) {
 		return [1,1];
 	} else if (key == _gl.MAX_TEXTURE_SIZE) {
 		return 2048;
+	} else if (key == _gl.MAX_VERTEX_ATTRIBS) {
+		return 8;
 	}
 }
 
 _gl.isContextLost = function() { return false; }
+
+_gl.getContextAttributes = function() {
+	return {
+		stencil: true,
+		antialias: true
+	};
+}
 
 
 window.XMLHttpRequest = function() {

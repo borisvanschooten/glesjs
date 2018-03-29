@@ -412,13 +412,17 @@ void __createTexture(const v8::FunctionCallbackInfo<v8::Value>& args) {
 	args.GetReturnValue().Set(v8::Integer::New(args.GetIsolate(), textures[0]));
 }
 
-
+void __deleteBuffer(const v8::FunctionCallbackInfo<v8::Value>& args) {
+	GLuint buffers[1];
+	buffers[0] = (GLuint)args[0]->IntegerValue();
+	glDeleteBuffers(1,buffers);
+}
 
 void __getProgramParameter(const v8::FunctionCallbackInfo<v8::Value>& args) {
 	int param[1];
 	GLuint program = (GLuint)args[0]->IntegerValue();
 	GLenum pname = (GLenum)args[1]->IntegerValue();
-	glGetShaderiv(program,pname,param);
+	glGetProgramiv(program,pname,param);
 	args.GetReturnValue().Set(v8::Integer::New(args.GetIsolate(), param[0]));
 }
 
@@ -430,13 +434,21 @@ void __getShaderParameter(const v8::FunctionCallbackInfo<v8::Value>& args) {
 	args.GetReturnValue().Set(v8::Integer::New(args.GetIsolate(), param[0]));
 }
 
+void __getBufferParameter(const v8::FunctionCallbackInfo<v8::Value>& args) {
+	int param[1];
+	GLuint target = (GLuint)args[0]->IntegerValue();
+	GLenum pname = (GLenum)args[1]->IntegerValue();
+	glGetBufferParameteriv(target,pname,param);
+	args.GetReturnValue().Set(v8::Integer::New(args.GetIsolate(), param[0]));
+}
+
 void __getProgramInfoLog(const v8::FunctionCallbackInfo<v8::Value>& args) {
 	GLuint program = (GLuint)args[0]->IntegerValue();
 	int length[1];
 	GLchar infolog[256];
 	// we can use glGetProgramiv to get the precise length of the string
 	// beforehand
-	glGetShaderInfoLog(program,256,length,infolog);
+	glGetProgramInfoLog(program,256,length,infolog);
 	args.GetReturnValue().Set(v8::String::NewFromUtf8(args.GetIsolate(),
 		infolog));
 }
@@ -642,6 +654,9 @@ JS::JS() {
 	_gl->Set(v8::String::NewFromUtf8(isolate, "createBuffer"),
 			v8::FunctionTemplate::New(isolate, __createBuffer));
 
+	_gl->Set(v8::String::NewFromUtf8(isolate, "deleteBuffer"),
+			v8::FunctionTemplate::New(isolate, __deleteBuffer));
+
 	_gl->Set(v8::String::NewFromUtf8(isolate, "createTexture"),
 			v8::FunctionTemplate::New(isolate, __createTexture));
 
@@ -650,6 +665,9 @@ JS::JS() {
 
 	_gl->Set(v8::String::NewFromUtf8(isolate, "getShaderParameter"),
 			v8::FunctionTemplate::New(isolate, __getShaderParameter));
+
+	_gl->Set(v8::String::NewFromUtf8(isolate, "getBufferParameter"),
+			v8::FunctionTemplate::New(isolate, __getBufferParameter));
 
 	_gl->Set(v8::String::NewFromUtf8(isolate, "getProgramInfoLog"),
 			v8::FunctionTemplate::New(isolate, __getProgramInfoLog));
