@@ -434,6 +434,7 @@ void __getShaderParameter(const v8::FunctionCallbackInfo<v8::Value>& args) {
 	args.GetReturnValue().Set(v8::Integer::New(args.GetIsolate(), param[0]));
 }
 
+
 void __getBufferParameter(const v8::FunctionCallbackInfo<v8::Value>& args) {
 	int param[1];
 	GLuint target = (GLuint)args[0]->IntegerValue();
@@ -468,12 +469,64 @@ void __getShaderInfoLog(const v8::FunctionCallbackInfo<v8::Value>& args) {
 //jni docs:
 //http://www3.ntu.edu.sg/home/ehchua/programming/java/JavaNativeInterface.html
 
+
+void __texImage2D(const v8::FunctionCallbackInfo<v8::Value>& args) {
+
+	int target = (int)args[0]->Int32Value();
+	int level = (int)args[1]->Int32Value();
+
+	// long version: texImage2D(GLenum target, GLint level, GLenum internalformat, GLsizei width, GLsizei height, GLint border, GLenum format, GLenum type, ArrayBufferView? pixels)
+	GLenum internalformat = (int)args[2]->Int32Value();
+	GLsizei width = (int)args[3]->Int32Value();
+	GLsizei height = (int)args[4]->Int32Value();
+	GLint border = (int)args[5]->Int32Value();
+	GLenum format = (int)args[6]->Int32Value();
+	GLenum type = (int)args[7]->Int32Value();
+	// data may be null in the long version, in which case an empty image
+	// is created
+	
+	if (args[8]->IsArrayBufferView()) {
+		LOGI("Tex from buffer view");
+		v8::Handle<v8::Uint8Array> bufview_data = Handle<Uint8Array>::Cast(args[8]);
+		v8::Handle<v8::ArrayBuffer> buf_data = bufview_data->Buffer();
+		v8::ArrayBuffer::Contents con_data=buf_data->GetData();
+		int datalen = con_data.ByteLength();
+		GLubyte *data = (GLubyte *)con_data.Data();
+		LOGI("length=%d", datalen);
+
+		GLubyte* pixels = new GLubyte[datalen];
+		  for (unsigned j = 0; j < datalen; j++) {
+		      pixels[j] = data[j];
+		      if (j < 50) LOGI("%d %d", j, ((GLubyte *)pixels)[j]);
+			  // LOGI("%d", ((GLubyte *)pixels)[1]);
+			  // LOGI("%d", ((GLubyte *)pixels)[2]);
+			  // LOGI("%d", ((GLubyte *)pixels)[3]);
+		  }
+
+		
+
+		glTexImage2D(target,level,internalformat,width,height,border,format,type,pixels);
+
+		delete[] pixels;
+		
+	} else {
+		LOGI("Empty tex");
+		// clear buffer. WebGL apparently expects the render texture to be
+		// empty, while Opengl will have garbage in the buffer when not
+		// explicity cleared
+		GLvoid *pixels = (void *)calloc(4,width*height);
+		glTexImage2D(target,level,internalformat,width,height,border,format, type,pixels);
+	}
+	
+
+}
+
 // We use Java's texImage2D because it parses pngs and jpgs properly.
 // No NDK equivalent exists.
 // We use GLUtils, which provides (amongst others):
 //   texImage2D(target,level,image,border);
 // We use defaults for format, internalformat, type.
-void __texImage2D(const v8::FunctionCallbackInfo<v8::Value>& args) {
+void __texImage2DFromFile(const v8::FunctionCallbackInfo<v8::Value>& args) {
 	// call method:
 	// (get signature with javap -s [classfile])
 	// static void Test()
@@ -487,28 +540,6 @@ void __texImage2D(const v8::FunctionCallbackInfo<v8::Value>& args) {
 	// get js parameters
 	int target = (int)args[0]->Int32Value();
 	int level = (int)args[1]->Int32Value();
-	if (args.Length()>=8) {
-		// long version: texImage2D(GLenum target, GLint level, GLenum internalformat, GLsizei width, GLsizei height, GLint border, GLenum format, GLenum type, ArrayBufferView? pixels)
-		GLenum internalformat = (int)args[2]->Int32Value();
-		GLsizei width = (int)args[3]->Int32Value();
-		GLsizei height = (int)args[4]->Int32Value();
-		GLint border = (int)args[5]->Int32Value();
-		GLenum format = (int)args[6]->Int32Value();
-		GLenum type = (int)args[7]->Int32Value();
-		// data may be null in the long version, in which case an empty image
-		// is created
-		GLvoid *pixels;
-		if (args.Length()>8 && !(args[8]->IsNull())) {
-			// TODO get pixels from ArrayBufferView
-		} else {
-			// clear buffer. WebGL apparently expects the render texture to be
-			// empty, while Opengl will have garbage in the buffer when not
-			// explicity cleared
-			pixels = (void *)calloc(4,width*height);
-		}
-		glTexImage2D(target,level,internalformat,width,height,border,format,
-			type,pixels);
-	}
 	// short version:texImage2D(target,level,format,internalformat,type,image);
 	// Not sure if border parameter is supported
 	// and where it should go.
@@ -679,6 +710,9 @@ JS::JS() {
 	// html5.js provides a wrapper that takes Image
 	_gl->Set(v8::String::NewFromUtf8(isolate, "_texImage2D"),
 			v8::FunctionTemplate::New(isolate, __texImage2D));
+
+	_gl->Set(v8::String::NewFromUtf8(isolate, "_texImage2DFromFile"),
+			v8::FunctionTemplate::New(isolate, __texImage2DFromFile));
 
 	_gl->Set(v8::String::NewFromUtf8(isolate, "_getImageDimensions"),
 			v8::FunctionTemplate::New(isolate, __getImageDimensions));

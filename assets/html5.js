@@ -3,6 +3,60 @@
 // This file is part of gles.js - a lightweight WebGL renderer for Android
 // HTML5 function and object emulation
 
+Object.assign = !function() {
+	var hasOwnProperty = Object.prototype.hasOwnProperty;
+	var propIsEnumerable = Object.prototype.propertyIsEnumerable;
+
+	function toObject(val) {
+		if (val === null || val === undefined) {
+			throw new TypeError('Object.assign cannot be called with null or undefined');
+		}
+
+		return Object(val);
+	}
+
+	return Object.assign || function (target, source) {
+		var from;
+		var to = toObject(target);
+		var symbols;
+
+		for (var s = 1; s < arguments.length; s++) {
+			from = Object(arguments[s]);
+
+			for (var key in from) {
+				if (hasOwnProperty.call(from, key)) {
+					to[key] = from[key];
+				}
+			}
+
+			if (Object.getOwnPropertySymbols) {
+				symbols = Object.getOwnPropertySymbols(from);
+				for (var i = 0; i < symbols.length; i++) {
+					if (propIsEnumerable.call(from, symbols[i])) {
+						to[symbols[i]] = from[symbols[i]];
+					}
+				}
+			}
+		}
+
+		return to;
+	};
+}();
+
+
+//from Jake Coxon patch: what's this for?
+//glesjs = true;
+
+// Console
+
+var _oldConsoleLog = console.log.bind(console);
+console.log = function() {
+	var args = Array.prototype.slice.call(arguments)
+	_oldConsoleLog(args.join(" "));
+}
+console.error = console.log
+console.warn = console.log
+
 // Image
 
 function Image() { }
@@ -11,6 +65,7 @@ Image.prototype = {
 	set src (val) {
 		this._src = val;
 		var dim = _gl._getImageDimensions(val);
+		//console.log("IMAGE DIMENSIONS", dim);
 		this.width = dim[0];
 		this.height = dim[1];
 		this.complete = true;
@@ -21,21 +76,39 @@ Image.prototype = {
 	}
 };
 
-_gl.texImage2D = function(target,level,p3,p4,p5,p6,p7,p8,p9) {
-	if (p8) {
-		// long version
-		this._texImage2D(target,level,p3,p4,p5,p6,p7,p8,p9);
-	} else {
-		if (!p6.src) {
-			// currently not fatal so C2 can continue
-			//throw "Image.src not defined or not an Image";
-			console.log("Image.src not defined or not an Image");
-			return;
-		}
-		// short version:
-		//_gl.texImage2D = function(target,level,format,internalformat,type, image);
-		this._texImage2D(target,level,p3,p4,p5,p6.src);
+_gl._texImage2DLong = function(target,level,internalFormat,width,height,border,format,type,pixels) {
+	console.log("_texImage2DLong")
+	console.log(_getGLConstant(_gl, target), _getGLConstant(_gl, level), _getGLConstant(_gl, internalFormat),
+			width, height, border, _getGLConstant(_gl, format), _getGLConstant(_gl, type), pixels);
+	this._texImage2D(target,level,internalFormat,width,height,border,format,type,pixels)
+}
+
+_gl._texImage2DShort = function(target,level,internalFormat,format,type,source) {
+	console.log("_texImage2DShort")
+	console.log.apply(console,arguments);
+	if (source.getContext) {
+		var ctx = source.getContext('2d');
+		var imageData = ctx.getImageData(0, 0, source.width, source.height);
+		this._texImage2DLong(target, level, internalFormat, source.width, source.height, 0, format, type, imageData.data);
+		return;
 	}
+	if (source.src) {
+		this._texImage2DFromFile(target,level,internalFormat,format,type,source.src);
+		return;
+	}
+	
+	// currently not fatal so C2 can continue
+	//throw "Image.src not defined or not an Image";
+	console.log("Image.src not defined or not an Image");
+}
+
+_gl.texImage2D = function() {
+	if (arguments.length == 6) {
+		this._texImage2DShort.apply(this, arguments);
+	} else {
+		this._texImage2DLong.apply(this, arguments);
+	}
+		
 }
 
 
@@ -85,6 +158,7 @@ Audio.prototype.readyState = 5;
 
 window = (function() {return this;}()); // window = GLOBAL in HTML
 
+window.top = window.self = window;
 //function window() {}
 
 window.addEventListener = function(eventtype,func,bool) {
@@ -107,6 +181,10 @@ window.setTimeout = function(callback, millisec) {
 	// XXX millisec is ignored
 	this._animationFrameCallback = callback;
 }
+window.clearTimeout = function() {}
+window.setImmediate = function() {}
+window.setInterval = function() {}
+window.clearInterval = function() {}
 
 // signal touchscreen device
 window.ontouchstart = function() {}
@@ -172,7 +250,60 @@ window.navigator.getGamepads = function() {
 window.WebGLRenderingContext = _gl;
 
 
+function _getGLConstant(ctx, value) {
+    if (value === undefined) return 'undefined';
+    for (var name in ctx) {
+        if (ctx[name] === value) {
+          return name;
+        }
+    }
+    return value.toString();
+}
+
+
 // hacks for C2
+
+
+var _oldPixelStorei = _gl.pixelStorei;
+_gl.pixelStorei = function() {
+	var args = Array.prototype.slice.call(arguments);
+	if (args[0] == this.UNPACK_PREMULTIPLY_ALPHA_WEBGL) return;
+	_oldPixelStorei.apply(this, args);
+}
+
+//function throwError(gl, msg) {
+//  var e = gl.getError();
+//  if (e != 0) {
+//    throw(new Error("Error " + getGLErrorAsString(gl, e) + " at " + msg));
+//  }
+//}
+//
+//function getGLErrorAsString(ctx, err) {
+//  if (err === ctx.NO_ERROR) {
+//    return "NO_ERROR";
+//  }
+//  for (var name in ctx) {
+//    if (ctx[name] === err) {
+//      return name;
+//    }
+//  }
+//  return err.toString();
+//}
+
+// var oldDrawElements = _gl.drawElements;
+// _gl.drawElements = function() {
+// 	// console.log("!!!! Drawing elements")
+// 	var args = Array.prototype.slice.call(arguments);
+// 	oldDrawElements.apply(this, args);
+// 	// throwError(this, "drawElements");
+// }
+// var oldEnableVertexAttribArray = _gl.enableVertexAttribArray;
+// _gl.enableVertexAttribArray = function() {
+// 	var args = Array.prototype.slice.call(arguments);
+// 	// console.log("!!!! Enabling vertex attrib array", args.join(" "))
+// 	oldEnableVertexAttribArray.apply(this, args);
+// 	// throwError(this, "enableVertexAttribArray");
+// }
 
 _gl.getParameter = function(key) {
 	if (key == _gl.ALIASED_POINT_SIZE_RANGE) {
@@ -211,7 +342,7 @@ window.XMLHttpRequest.prototype.send = function(post) {
 		this._elementsByID = {};
 		this._elementsByTagName = {};
 		this.responseXML = HTMLParser.htmlToDomTree(this.responseText,
-			this._elementsByID, this._elementsByTagName);
+			this._elementsByID, this._elementsByTagName)[0];
 		// XXX only defined for root node
 		this.responseXML._elementsByTagName = this._elementsByTagName;
 	}
@@ -278,9 +409,40 @@ _node.prototype.getElementsByTagName = function(tagname) {
 	return this._elementsByTagName[tagname.toUpperCase()];
 }
 
+Object.defineProperty(_node.prototype, "innerHTML", 
+	{ 
+		set: function (html) { 
+			this.childNodes = HTMLParser.htmlToDomTree(html, document._elementsById) || [];
+			this.firstChild = this.childNodes[0];
+			this.lastChild = this.childNodes[this.childNodes.length-1];
+			return html;
+		}
+	}
+);
+
+// innerHTML ???
+// set immediate  
+// getelemtns by tag name / query
+// contains
+
+_node.prototype.contains = function(a) {
+	return false;
+}
 
 _node.prototype.getAttribute = function(name) {
 	return this._attributes[name];
+}
+
+_node.prototype.hasAttribute = function(name) {
+	return !!this._attributes[name];
+}
+
+_node.prototype.setAttribute = function(name, value) {
+	this._attributes[name] = value.toString();
+}
+
+_node.prototype.removeAttribute = function(name) {
+	delete this._attributes[name];
 }
 
 _node.prototype._getElementIndex = function(elem) {
@@ -549,22 +711,23 @@ HTMLParser.parse = function (html, handler) {
 // tagMap (optional): map of tagnames -> array of _nodes to use for
 //     getElementsByTagName.
 HTMLParser.htmlToDomTree = function (html, elemMap, tagMap) {
-	var root = null;
+	var roots = [];
 	var stack = [];
 
 	HTMLParser.parse(html, {
 		start: function (tag, attrs, unary) {
 			tag = tag.toUpperCase();
-			var node = new _node(tag,1);
+			var node = tag == "CANVAS" ? _canvas : document.createElement(tag);
 			if (tagMap) {
 				if (!tagMap[tag]) tagMap[tag] = [];
 				tagMap[tag].push(node);
 			}
 			stack.push(node);
 			// first node encountered is root
-			if (root==null) root=node;
 			if (stack.length > 1)
 				stack[stack.length-2].appendChild(node);
+			else 
+				roots.push(node);
 			for (var i = 0; i < attrs.length; i++) {
 				var name = attrs[i].name.toLowerCase();
 				var value = attrs[i].value;
@@ -597,7 +760,7 @@ HTMLParser.htmlToDomTree = function (html, elemMap, tagMap) {
 		}
 	});
 
-	return root;
+	return roots;
 };
 
 /** END html5 parser **/
@@ -606,6 +769,8 @@ HTMLParser.htmlToDomTree = function (html, elemMap, tagMap) {
 
 
 function document() {}
+
+window.document = document;
 
 document.addEventListener = function(eventtype,func,bool) {
 	_canvas.addEventListener(eventtype,func,bool);
@@ -626,20 +791,32 @@ document.getElementById = function(id) {
 // is used to look up elements
 document._elementsById = {};
 
-
-document.documentElement = HTMLParser.htmlToDomTree(_utils.loadStringAsset("index.html"),
-	document._elementsById);
-
-document.head = _findNodeName(document.documentElement,"HEAD");
-document.body = _findNodeName(document.documentElement,"BODY");
-
+// What's this for? From Jake Coxon's patch
+//var _createdCanvas = false;
 
 document.createElement = function(nodeName) {
-	if (nodeName.toUpperCase()=="CANVAS") return _canvas;
+	if (nodeName.toUpperCase() == "CANVAS") {
+		// assumes that only one canvas is created.
+		// More substantial changes are required to handle multiple canvases
+		console.log("Canvas obtained through createElement");
+		return _canvas;
+		//return new _canvasnode();
+	}
 	return new _node(nodeName,1);
 }
 
 document.ready = function() {};
+
+document.getElementsByTagName = function(x) {
+	console.log("getElementsByTagName",x)
+};
+document.querySelector = function(x) {
+	console.log("querySelector", x)
+};
+document.querySelectorAll = function(x) {
+	console.log("querySelectorAll", x)
+}
+
 
 
 // _canvas is the game canvas
@@ -647,11 +824,42 @@ document.ready = function() {};
 _canvasnode.prototype = new _node("CANVAS",1);
 
 function _canvasnode() {
+	this._width = 32;
+	this._height = 32;
 	_node.apply(this,["CANVAS",1]);
 	// relative mouse emulation
 }
 
-_canvas = new _canvasnode();
+Object.defineProperty(_canvasnode.prototype, 'width', { 
+	set: function(width) {
+		this._width = width;
+		this._context2d && this._context2d._resize();
+	},
+	get: function() { return this._width }
+})
+Object.defineProperty(_canvasnode.prototype, 'height', { 
+	set: function(height) {
+		this._height = height;
+		this._context2d && this._context2d._resize();
+	},
+	get: function() { return this._height }
+})
+
+
+_canvasnode.prototype.getContext = function(type) {
+	if (type.toLowerCase().trim()=="2d") {
+		return this._context2d || (this._context2d = new _2dcontext(this));
+	} else {
+		return _gl;
+	}
+}
+
+_canvasnode.prototype.getBoundingClientRect = function() {
+	return new _Rectangle(0,0,this.width,this.height);
+}
+
+_canvas = new _canvasnode(0, 0);
+_canvas._contextWebGL = _gl;
 
 _canvas._mousesens = 2.0;
 _canvas._mousedown = false;
@@ -705,32 +913,43 @@ _canvas.addEventListener = function(eventtype,func,bool) {
 _canvas.removeEventListener = function(eventtype,func,bool) { }
 
 
-_canvas.getContext = function(type) {
-	if (type.toLowerCase().trim()=="2d") {
-		return new _2dcontext();
-	} else {
-		return _gl;
-	}
-}
-
-
-_canvas.getBoundingClientRect = function() {
-	return new _Rectangle(0,0,_canvas.width,_canvas.height);
-}
 
 
 // dummy context to make sure apps don't crash
 
-function _2dcontext() { }
+function _2dcontext(node) {
+	this.node = node;
+	this.width = node.width;
+	this.height = node.height;
+	this._resize();
+}
 
-_2dcontext.prototype.fillRect = function(x,y,w,h) { }
+_2dcontext.prototype._resize = function() {
+	this.width = this.node.width;
+	this.height = this.node.height;
+	this.data = new Uint8Array(this.height * this.width * 4);
+	this.fillRect(0, 0, this.width, this.height);
+}
+
+_2dcontext.prototype.fillRect = function(x,y,w,h) {
+	for (var j = 0; j < h; j++) {
+		for (var i = 0; i < w; i++) {
+			this.data[(j * this.width + i) * 4 + 0] = 0xff;
+			this.data[(j * this.width + i) * 4 + 1] = 0xff;
+			this.data[(j * this.width + i) * 4 + 2] = 0xff;
+			this.data[(j * this.width + i) * 4 + 3] = 0x00;
+		}
+	}
+}
 
 _2dcontext.prototype.createImageData = function(width,height) {
 	return { data: [] };
 }
 
 _2dcontext.prototype.getImageData = function(x,y,w,h) {
+	console.log("Getting image data", x, y, w, h)
 	// return array of the right size filled with zeroes
+	// XXX or, return subrectangle of this.data?
 	ret = [];
 	for (var i=0; i<w*h*4; i++) ret.push(0);
 	return { data: ret };
@@ -738,13 +957,25 @@ _2dcontext.prototype.getImageData = function(x,y,w,h) {
 
 _2dcontext.prototype.drawImage = function() { }
 
+// from Jake Coxon patch: what is this for?
+//var empty = function() {};
+
+"scale,translate,beginPath,closePath,arc,fill,stroke,moveTo,lineTo,bezierCurveTo,quadraticCurveTo,rect".
+	split(",").forEach(function(name) {
+		_2dcontext.prototype[name] = function() {
+			console.log("Not implemented", name)
+		};
+		
+	})
+
 
 // _gl should have _canvas as attribute
 _gl.canvas = _canvas;
 
 // handling input callbacks from embedder
 
-function _MouseEvent(x,y,dx,dy) {
+function _MouseEvent(x,y,dx,dy,type) {
+	this.type = type;
 	this.clientX = x;
 	this.clientY = y;
 	this.pageX = x;
@@ -839,13 +1070,13 @@ function _mouseMoveCallback(ptrid,x,y) {
 	if (_canvas._mouseMoveCallback) {
 		// you can choose between relative or absolute mouse position
 		// absolute
-		//_canvas._prevMouseEvent = new _MouseEvent(x, y,
-		//		x - _canvas._prevmousex, y - _canvas._prevmousey);
+		_canvas._prevMouseEvent = new _MouseEvent(x, y,
+				x - _canvas._prevmousex, y - _canvas._prevmousey, 'mousemove');
 		// relative
-		_canvas._prevMouseEvent = new _MouseEvent(
-			_canvas._virtmousex, _canvas._virtmousey,
-			_canvas._virtmousex - _canvas.prevvirtmousex,
-			_canvas._virtmousey - _canvas.prevvirtmousey);
+		// _canvas._prevMouseEvent = new _MouseEvent(
+		// 	_canvas._virtmousex, _canvas._virtmousey,
+		// 	_canvas._virtmousex - _canvas.prevvirtmousex,
+		// 	_canvas._virtmousey - _canvas.prevvirtmousey, 'mousemove');
 		_canvas._mouseMoveCallback(_canvas._prevMouseEvent);
 	}
 	_canvas._prevmousex = x;
@@ -859,12 +1090,14 @@ function _mouseUpCallback(ptrid) {
 	//console.log("#####touchend "+ptrid);
 	_canvas._mousedown = false;
 	if (_canvas._mouseUpCallback) {
-		_canvas._mouseUpCallback(_canvas._prevMouseEvent);
+		var a = _canvas._prevMouseEvent;
+		_canvas._mouseUpCallback(new _MouseEvent(a.x, a.y, a.movementX, a.movementY, 'mouseup'));
 		//_canvas._mouseUpCallback(new _MouseButtonEvent(0));
 	}
 	// for touch, mouseup = mouseout
 	if (_canvas._mouseOutCallback) {
-		_canvas._mouseOutCallback(_canvas._prevMouseEvent);
+		var a = _canvas._prevMouseEvent;
+		_canvas._mouseOutCallback(new _MouseEvent(a.x, a.y, a.movementX, a.movementY, 'mouseup'));
 		//_canvas._mouseOutCallback(new _MouseButtonEvent(0));
 	}
 	// touch handling
@@ -883,7 +1116,8 @@ function _mouseUpCallback(ptrid) {
 
 function _mouseDownCallback(ptrid) {
 	if (_canvas._mouseDownCallback) {
-		_canvas._mouseDownCallback(_canvas._prevMouseEvent);
+		var a = _canvas._prevMouseEvent;
+		_canvas._mouseDownCallback(new _MouseEvent(a.x, a.y, a.movementX, a.movementY, 'mousedown'));
 		//_canvas._mouseDownCallback(new _MouseButtonEvent(0));
 	}
 	if (_canvas._touchStartCallback) {
@@ -971,7 +1205,17 @@ _utils.PLAYERDATASIZE = 1 + _utils.NR_BUTTONS + _utils.NR_AXES;
 _utils.gamepadvalues=new Float32Array(_utils.NR_PLAYERS*_utils.PLAYERDATASIZE);
 _utils.gamepads = [new Gamepad(0),new Gamepad(1),new Gamepad(2),new Gamepad(3)];
 
+function _loadDocumentElement() {
+	document.documentElement = HTMLParser.htmlToDomTree(_utils.loadStringAsset("index.html"),
+		document._elementsById)[0];
+
+	document.head = _findNodeName(document.documentElement,"HEAD");
+	document.body = _findNodeName(document.documentElement,"BODY");
+}
+
 // MAIN
+
+_loadDocumentElement();
 
 _updateScreenSize();
 

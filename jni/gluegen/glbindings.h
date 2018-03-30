@@ -58,13 +58,27 @@ void __blendFuncSeparate(const v8::FunctionCallbackInfo<v8::Value>& args) {
 void __bufferData(const v8::FunctionCallbackInfo<v8::Value>& args) {
 	HandleScope handle_scope(js->isolate);
 	unsigned int target = (unsigned int)args[0]->IntegerValue();
-	v8::Handle<v8::ArrayBufferView> bufview_data = Handle<ArrayBufferView>::Cast(args[1]);
-	v8::Handle<v8::ArrayBuffer> buf_data = bufview_data->Buffer();
-	v8::ArrayBuffer::Contents con_data=buf_data->GetData();
-	GLsizeiptr size = con_data.ByteLength();
-	void *data = con_data.Data();
 	unsigned int usage = (unsigned int)args[2]->IntegerValue();
-	glBufferData(target,size,data,usage);
+	if(args[1]->IsArrayBufferView()) {
+		v8::Handle<v8::ArrayBufferView> bufview_data = Handle<ArrayBufferView>::Cast(args[1]);
+		v8::Handle<v8::ArrayBuffer> buf_data = bufview_data->Buffer();
+		v8::ArrayBuffer::Contents con_data=buf_data->GetData();
+		GLsizeiptr size = con_data.ByteLength();
+		LOGI("Creating buffer from array buffer view size=%d",(int)size);
+		void *data = con_data.Data();
+		glBufferData(target,size,data,usage);
+	} else if (args[1]->IsArrayBuffer()) {
+		v8::Handle<v8::ArrayBuffer> buf_data = Handle<ArrayBuffer>::Cast(args[1]);
+		v8::ArrayBuffer::Contents con_data=buf_data->GetData();
+		GLsizeiptr size = con_data.ByteLength();
+		LOGI("Creating buffer from array buffer size=%d",(int)size);
+		void *data = con_data.Data();
+		glBufferData(target,size,data,usage);
+	} else {
+		GLsizeiptr size = (GLsizeiptr)args[1]->IntegerValue();
+		LOGI("Creating buffer from size size=%d",(int)size);
+		glBufferData(target,size,NULL,usage);
+	}
 }
 void __bufferSubData(const v8::FunctionCallbackInfo<v8::Value>& args) {
 	HandleScope handle_scope(js->isolate);
