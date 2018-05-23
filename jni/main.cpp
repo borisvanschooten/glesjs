@@ -20,9 +20,13 @@
 #include <android/asset_manager.h>
 
 
+//FIXME prevent v8 create object crash.
+//Maybe use newer version libv8* should open it.
+#if 0
 // replacement for old symbol found in current libv8 binary
 #include <unistd.h>
 unsigned int __page_size = getpagesize();
+#endif
 
 
 #include <v8.h>
@@ -470,6 +474,83 @@ void __getShaderInfoLog(const v8::FunctionCallbackInfo<v8::Value>& args) {
 //http://www3.ntu.edu.sg/home/ehchua/programming/java/JavaNativeInterface.html
 
 
+// We use Java's texImage2D because it parses pngs and jpgs properly.
+// No NDK equivalent exists.
+// We use GLUtils, which provides (amongst others):
+//   texImage2D(target,level,image,border);
+// We use defaults for format, internalformat, type.
+void __texImage2D(const v8::FunctionCallbackInfo<v8::Value>& args) {
+	// call method:
+	// (get signature with javap -s [classfile])
+	// static void Test()
+	//jmethodID mid = jnienv->GetStaticMethodID(utilsClass, "Test", "()V");
+	//jnienv->CallStaticVoidMethod(utilsClass,mid);
+
+	// call method:
+	// static void texImage2D(int target,int level,byte [] data,int border)
+	jmethodID mid = jnienv->GetStaticMethodID(utilsClass, "texImage2D",
+		"(II[BI)[I");
+	// get js parameters
+	int target = (int)args[0]->Int32Value();
+	int level = (int)args[1]->Int32Value();
+	if (args.Length()>=8) {
+		// long version: texImage2D(GLenum target, GLint level, GLenum internalformat, GLsizei width, GLsizei height, GLint border, GLenum format, GLenum type, ArrayBufferView? pixels)
+		GLenum internalformat = (int)args[2]->Int32Value();
+		GLsizei width = (int)args[3]->Int32Value();
+		GLsizei height = (int)args[4]->Int32Value();
+		GLint border = (int)args[5]->Int32Value();
+		GLenum format = (int)args[6]->Int32Value();
+		GLenum type = (int)args[7]->Int32Value();
+		// data may be null in the long version, in which case an empty image
+		// is created
+		GLvoid *pixels;
+		if (args.Length()>8 && !(args[8]->IsNull())) {
+			// TODO get pixels from ArrayBufferView
+		} else {
+			// clear buffer. WebGL apparently expects the render texture to be
+			// empty, while Opengl will have garbage in the buffer when not
+			// explicity cleared
+			pixels = (void *)calloc(4,width*height);
+		}
+		glTexImage2D(target,level,internalformat,width,height,border,format,
+			type,pixels);
+	}
+	// short version:texImage2D(target,level,format,internalformat,type,image);
+	// Not sure if border parameter is supported
+	// and where it should go.
+	String::Utf8Value _str_assetname(args[5]->ToString());
+	const char *assetname = *_str_assetname;
+	// read asset.  XXX move this to Java
+	char *imagedata;
+	int imagedatalen = readAsset(assetname,&imagedata);
+	// convert parameters to java
+    jbyteArray jBuff = jnienv->NewByteArray(imagedatalen);
+    jnienv->SetByteArrayRegion(jBuff, 0, imagedatalen, (jbyte*) imagedata);
+	// docs for byte array functions:
+	//jbyteArray    NewByteArray(JNIEnv *env, jsize length);
+	//void      ReleaseByteArrayElements(JNIEnv *env, jbyteArray array, jbyte *elems, jint mode);
+	//void GetByteArrayRegion(JNIEnv *env, jbyteArray array, jsize start, jsize len, jbyte *buf);
+	//void SetByteArrayRegion(JNIEnv *env, jbyteArray array, jsize start, jsize len, jbyte *buf);
+	jintArray retval_j = (jintArray) jnienv->CallStaticObjectMethod(
+		utilsClass,mid, (jint)target, (jint)level, jBuff, (jint)0);
+	//http://www.rgagnon.com/javadetails/java-0287.html
+	jint *retval = jnienv->GetIntArrayElements(retval_j, 0);
+	int retwidth = retval[0];
+	int retheight = retval[1];
+	jnienv->ReleaseIntArrayElements(retval_j, retval, 0);//XXX use JNI_ABORT
+	jnienv->DeleteLocalRef(retval_j);
+	jnienv->DeleteLocalRef(jBuff);
+	// XXX return value no longer used!
+	// return width, height
+	// from: https://v8.googlecode.com/svn/trunk/test/cctest/test-api.cc
+	v8::Handle<v8::Array> jsretval =
+		v8::Array::New(args.GetIsolate(), 2);
+	jsretval->Set(0, v8::Integer::New(args.GetIsolate(), retwidth));
+	jsretval->Set(1, v8::Integer::New(args.GetIsolate(), retheight));
+	args.GetReturnValue().Set(jsretval);
+}
+
+#if 0
 void __texImage2D(const v8::FunctionCallbackInfo<v8::Value>& args) {
 
 	int target = (int)args[0]->Int32Value();
@@ -517,9 +598,8 @@ void __texImage2D(const v8::FunctionCallbackInfo<v8::Value>& args) {
 		GLvoid *pixels = (void *)calloc(4,width*height);
 		glTexImage2D(target,level,internalformat,width,height,border,format, type,pixels);
 	}
-	
-
 }
+#endif
 
 // We use Java's texImage2D because it parses pngs and jpgs properly.
 // No NDK equivalent exists.
@@ -609,8 +689,6 @@ void __getWindowHeight(const v8::FunctionCallbackInfo<v8::Value>& args) {
 	args.GetReturnValue().Set(v8::Integer::New(args.GetIsolate(),
 		screenheight));
 }
-
-
 
 
 JS::JS() {
@@ -737,6 +815,7 @@ JS::JS() {
 	//Context::Scope context_scope(context);
 
 }
+
 char *JS::run_javascript(char *sourcestr) {
 	Isolate::Scope isolate_scope(isolate);
 	HandleScope handle_scope(isolate);
@@ -765,6 +844,7 @@ char *JS::run_javascript(char *sourcestr) {
 		return strdup(ret);
 	}
 }
+
 void JS::callFunction(const char *funcname,const int argc,Handle<Value> argv[]){
 	// init
 	Isolate::Scope isolate_scope(isolate);
@@ -850,7 +930,6 @@ static void boot_javascript(int w,int h) {
 	const int argc1 = 2;
 	Handle<Value> argv1[argc1] = { js_width, js_height };
 	js->callFunction("_documentLoaded",argc1,argv1);
-
 
 }
 
