@@ -272,6 +272,8 @@ void __audio_handle(const v8::FunctionCallbackInfo<v8::Value>& args) {
 	// call method:
   	//static void handleAudio(int, java.lang.String, boolean, int);
     //Signature: (ILjava/lang/String;ZI)V
+	utilsClass = jnienv->FindClass("net/tmtg/glesjs/GlesJSUtils");
+
 	jmethodID mid = jnienv->GetStaticMethodID(utilsClass, "handleAudio",
 		"(ILjava/lang/String;ZI)V");
 	jstring jniassetname = jnienv->NewStringUTF(assetname);
